@@ -718,6 +718,16 @@ impl<B: AudioBackend> MicController<B> {
         self.mute_all(state)
     }
 
+    pub fn refresh_state(&mut self) -> Result<bool> {
+        let previous = self.muted;
+        self.muted = self.is_muted_all()?;
+        Ok(previous != self.muted)
+    }
+
+    pub fn mute_display_state(&self) -> bool {
+        self.desired_muted || self.muted
+    }
+
     pub fn should_enforce_mute(&self) -> bool {
         self.desired_muted
     }
@@ -894,6 +904,46 @@ mod tests {
         assert!(target_state(None, false));
         assert!(!target_state(None, true));
         assert!(!target_state(Some(false), true));
+    }
+
+    #[test]
+    fn refresh_state_tracks_external_mute_changes() {
+        let backend = FakeBackend::with_devices(vec![(1, Device::native("Built-in", false))]);
+        let mut controller = MicController::with_backend(backend).unwrap();
+        assert!(!controller.muted);
+
+        controller.backend.device_mut(1).unwrap().mute = Some(true);
+        let changed = controller.refresh_state().unwrap();
+
+        assert!(changed);
+        assert!(controller.muted);
+        assert!(!controller.should_enforce_mute());
+    }
+
+    #[test]
+    fn refresh_state_reports_unchanged_state() {
+        let backend = FakeBackend::with_devices(vec![(1, Device::native("Built-in", false))]);
+        let mut controller = MicController::with_backend(backend).unwrap();
+
+        let changed = controller.refresh_state().unwrap();
+
+        assert!(!changed);
+        assert!(!controller.muted);
+    }
+
+    #[test]
+    fn mute_display_state_uses_desired_state_when_enforcing() {
+        let mut device = Device::native("Built-in", false);
+        device.fail_set_mute = true;
+        let backend = FakeBackend::with_devices(vec![(1, device)]);
+        let mut controller = MicController::with_backend(backend).unwrap();
+
+        let result = controller.mute_all(true);
+
+        assert!(result.is_err());
+        assert!(!controller.muted);
+        assert!(controller.should_enforce_mute());
+        assert!(controller.mute_display_state());
     }
 
     #[test]

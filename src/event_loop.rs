@@ -46,14 +46,25 @@ fn update_mic(
     toggle: bool,
 ) {
     let mut controller = controller.write().unwrap();
+    let mut ui_needs_update = false;
     if toggle || controller.should_enforce_mute() {
         let state = if toggle { None } else { Some(true) };
         if let Err(err) = controller.toggle(state) {
             log::error!("Failed to update microphone mute state: {}", err);
         }
+        ui_needs_update = true;
+    } else {
+        match controller.refresh_state() {
+            Ok(changed) => ui_needs_update = changed,
+            Err(err) => log::error!("Failed to refresh microphone mute state: {}", err),
+        }
+    }
+
+    if ui_needs_update {
         let device_name = controller.active_device_name();
+        let display_muted = controller.mute_display_state();
         let mut ui = ui.write().unwrap();
-        ui.update_mic(controller.muted, device_name.as_deref())
+        ui.update_mic(display_muted, device_name.as_deref())
             .unwrap();
     }
     if toggle && !controller.muted {

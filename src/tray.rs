@@ -10,12 +10,22 @@ use tray_icon::{Icon, TrayIcon, TrayIconBuilder};
 
 const MUTE_TEXT: &str = "Mute";
 const UNMUTE_TEXT: &str = "Unmute";
+const STATUS_MUTED_TEXT: &str = "Mute: Enabled";
+const STATUS_UNMUTED_TEXT: &str = "Mute: Disabled";
 
 pub fn get_mute_menu_text(muted: bool) -> &'static str {
     if muted {
         UNMUTE_TEXT
     } else {
         MUTE_TEXT
+    }
+}
+
+pub fn get_mute_status_text(muted: bool) -> &'static str {
+    if muted {
+        STATUS_MUTED_TEXT
+    } else {
+        STATUS_UNMUTED_TEXT
     }
 }
 
@@ -63,6 +73,7 @@ impl fmt::Debug for Tray {
 
 pub struct Tray {
     pub systray: TrayIcon,
+    pub mute_status: MenuItem,
     pub toggle_mute: MenuItem,
     pub launch_at_login: CheckMenuItem,
     pub show_in_dock: CheckMenuItem,
@@ -82,6 +93,7 @@ impl Tray {
         trace!("Creating tray icon");
         let icon = get_icon(muted, theme)?;
         let tray_menu = Menu::new();
+        let mute_status = MenuItem::new(get_mute_status_text(muted), false, None);
         let toggle_mute = MenuItem::new(
             get_mute_menu_text(muted),
             true,
@@ -94,6 +106,7 @@ impl Tray {
 
         tray_menu
             .append_items(&[
+                &mute_status,
                 &toggle_mute,
                 &PredefinedMenuItem::separator(),
                 &launch_at_login,
@@ -115,6 +128,7 @@ impl Tray {
         trace!("Tray item created");
         let tray = Self {
             systray,
+            mute_status,
             toggle_mute,
             launch_at_login,
             show_in_dock,
@@ -139,6 +153,7 @@ impl Tray {
     }
 
     fn update_menu(&mut self, muted: bool) -> Result<()> {
+        self.mute_status.set_text(get_mute_status_text(muted));
         self.toggle_mute.set_text(get_mute_menu_text(muted));
         trace!("Updated tray menu");
         Ok(())
@@ -185,5 +200,15 @@ mod tests {
     #[test]
     fn test_get_mute_menu_text_unmuted() {
         assert_eq!(get_mute_menu_text(false), "Mute");
+    }
+
+    #[test]
+    fn test_get_mute_status_text_muted() {
+        assert_eq!(get_mute_status_text(true), "Mute: Enabled");
+    }
+
+    #[test]
+    fn test_get_mute_status_text_unmuted() {
+        assert_eq!(get_mute_status_text(false), "Mute: Disabled");
     }
 }
